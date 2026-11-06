@@ -1,0 +1,148 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model DemoSession {
+  id           String             @id @default(cuid())
+  sessionToken String             @unique
+  displayName  String             @default("Young Investor")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  wallet       VirtualWallet?
+  progress     UserProgress?
+  badges       UserBadge[]
+  archives     PortfolioArchive[]
+}
+
+model VirtualWallet {
+  id            String               @id @default(cuid())
+  sessionId     String               @unique
+  session       DemoSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  balance       Float                @default(100000.0) // Liquid cash balance in INR
+  investedValue Float                @default(0.0)
+  realizedPnL   Float                @default(0.0)
+  currency      String               @default("INR")
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  ledgerEntries WalletLedger[]
+  orders        StockOrder[]
+  holdings      StockHolding[]
+  mfHoldings    MutualFundHolding[]
+  sipSchedules  SipSchedule[]
+}
+
+model WalletLedger {
+  id           String        @id @default(cuid())
+  walletId     String
+  wallet       VirtualWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amount       Float         // Positive: credit, Negative: debit
+  balanceAfter Float
+  type         String        // INITIAL_GRANT, STOCK_BUY, STOCK_SELL, MF_BUY, MF_SELL, RESET
+  referenceId  String?
+  description  String
+  createdAt    DateTime      @default(now())
+}
+
+model StockOrder {
+  id            String        @id @default(cuid())
+  walletId      String
+  wallet        VirtualWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  symbol        String
+  name          String
+  side          String        // BUY, SELL
+  type          String        // MARKET, LIMIT, STOP_LOSS
+  quantity      Int
+  price         Float
+  triggerPrice  Float?
+  status        String        // PENDING, FILLED, CANCELLED, REJECTED
+  slippage      Float         @default(0.0)
+  executedPrice Float?
+  executedAt    DateTime?
+  createdAt     DateTime      @default(now())
+}
+
+model StockHolding {
+  id           String        @id @default(cuid())
+  walletId     String
+  wallet       VirtualWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  symbol       String
+  name         String
+  quantity     Int
+  averagePrice Float
+  currentPrice Float
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([walletId, symbol])
+}
+
+model MutualFundHolding {
+  id             String        @id @default(cuid())
+  walletId       String
+  wallet         VirtualWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  schemeCode     String
+  schemeName     String
+  category       String
+  units          Float
+  averageNav     Float
+  currentNav     Float
+  investedAmount Float
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([walletId, schemeCode])
+}
+
+model SipSchedule {
+  id             String        @id @default(cuid())
+  walletId       String
+  wallet         VirtualWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  schemeCode     String
+  schemeName     String
+  monthlyAmount  Float
+  frequency      String        @default("MONTHLY")
+  status         String        @default("ACTIVE") // ACTIVE, PAUSED, CANCELLED
+  dayOfMonth     Int           @default(1)
+  totalInvested  Float         @default(0.0)
+  createdAt      DateTime      @default(now())
+  lastExecutedAt DateTime?
+}
+
+model UserProgress {
+  id               String      @id @default(cuid())
+  sessionId        String      @unique
+  session          DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  xp               Int         @default(0)
+  coins            Int         @default(50)
+  streakDays       Int         @default(1)
+  completedLessons String      @default("[]") // JSON string of completed lesson IDs
+  completedQuizzes String      @default("[]") // JSON string of completed quiz IDs
+  unlockedLevel    Int         @default(1)
+  lastActiveDate   DateTime    @default(now())
+}
+
+model UserBadge {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  badgeId     String
+  title       String
+  description String
+  icon        String
+  unlockedAt  DateTime    @default(now())
+
+  @@unique([sessionId, badgeId])
+}
+
+model PortfolioArchive {
+  id                  String      @id @default(cuid())
+  sessionId           String
+  session             DemoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  finalPortfolioValue Float
+  realizedPnL         Float
+  archivedAt          DateTime    @default(now())
+  summary             String
+}

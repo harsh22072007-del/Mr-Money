@@ -16,6 +16,11 @@
 # next.js
 /.next/
 /out/
+/prisma/.next/
+
+# local database artifacts
+prisma/*.db
+prisma/*.db-journal
 
 # production
 /build
